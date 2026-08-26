@@ -630,17 +630,40 @@
 
       // --- LOAD MENU DATA (Flot dashboard CMS first, then legacy API, then bundled file) ---
       const DASHBOARD_MENU_API = 'https://dashboard.flotme.ai/api/public/menu/25da80ad-9001-4451-b5ec-547c56f6c9d5';
+      function isUsableMenu(data) {
+        return data &&
+          typeof data === 'object' &&
+          data.branding &&
+          typeof data.branding === 'object' &&
+          Array.isArray(data.groups) &&
+          data.groups.length > 0 &&
+          data.groups.every(group => group && typeof group.id === 'string' && typeof group.label === 'string') &&
+          Array.isArray(data.sections) &&
+          data.sections.some(section => section && Array.isArray(section.items) && section.items.length > 0) &&
+          data.sections.every(section => section &&
+            typeof section.id === 'string' &&
+            typeof section.title === 'string' &&
+            typeof section.groupId === 'string' &&
+            Array.isArray(section.items) &&
+            section.items.every(item => item &&
+              typeof item.name === 'string' &&
+              (typeof item.price === 'number' || typeof item.price === 'string') &&
+              (item.tags === undefined || Array.isArray(item.tags))));
+      }
       async function loadMenuData() {
         try {
           const res = await fetch(DASHBOARD_MENU_API);
-          if (res.ok) return await res.json();
+          const data = res.ok ? await res.json() : null;
+          if (isUsableMenu(data)) return data;
         } catch (e) { /* dashboard unavailable, try legacy API */ }
         try {
           const res = await fetch('/api/menu');
-          if (res.ok) return await res.json();
+          const data = res.ok ? await res.json() : null;
+          if (isUsableMenu(data)) return data;
         } catch (e) { /* legacy API unavailable, try bundled file */ }
         const fallback = await fetch('/menu_data.json');
-        if (fallback.ok) return await fallback.json();
+        const data = fallback.ok ? await fallback.json() : null;
+        if (isUsableMenu(data)) return data;
         throw new Error('No menu data available');
       }
 
@@ -674,7 +697,7 @@
             if (menuData.groups && menuData.groups[0]) switchGroup(menuData.groups[0].id);
           } catch (err) { /* ignore malformed preview */ }
         });
-        window.parent.postMessage({ source: 'flot-site', type: 'preview-ready' }, '*');
+        window.parent.postMessage({ source: 'flot-site', type: 'preview-ready' }, 'https://dashboard.flotme.ai');
       }
 
       // --- RENDER FUNCTIONS ---
